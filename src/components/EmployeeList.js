@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const EmployeeList = ({ employees, onEdit, onDelete }) => {
+const EmployeeList = ({ employees, onEdit, onDelete, sortBy, onSortChange }) => {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   const handleDeleteClick = (employee) => {
@@ -18,12 +18,6 @@ const EmployeeList = ({ employees, onEdit, onDelete }) => {
     setDeleteConfirm(null);
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR'
-    }).format(amount);
-  };
 
   const formatDate = (dateString) => {
     const d = new Date(dateString);
@@ -33,6 +27,17 @@ const EmployeeList = ({ employees, onEdit, onDelete }) => {
     return `${dd}-${mm}-${yyyy}`;
   };
 
+  const headerButton = (label, active) => (
+    <div className="flex items-center gap-1">
+      <span>{label}</span>
+      <svg
+        className={`h-3 w-3 ${active ? 'text-blue-600' : 'text-gray-300'}`}
+        viewBox="0 0 20 20" fill="currentColor"
+      >
+        <path d="M5 8l5-5 5 5H5z" />
+      </svg>
+    </div>
+  );
 
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">
@@ -49,18 +54,55 @@ const EmployeeList = ({ employees, onEdit, onDelete }) => {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Name
+                <button
+                  type="button"
+                  onClick={() => onSortChange(sortBy === 'nameAsc' ? '' : 'nameAsc')}
+                  className="inline-flex items-center gap-1 text-gray-700 hover:text-blue-700"
+                  title="Sort by Name (A→Z)"
+                >
+                  {headerButton('Name', sortBy === 'nameAsc')}
+                </button>
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Email
+                <button
+                  type="button"
+                  onClick={() => onSortChange(sortBy === 'emailAsc' ? '' : 'emailAsc')}
+                  className="inline-flex items-center gap-1 text-gray-700 hover:text-blue-700"
+                  title="Sort by Email (A→Z)"
+                >
+                  {headerButton('Email', sortBy === 'emailAsc')}
+                </button>
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Position
+                <button
+                  type="button"
+                  onClick={() => onSortChange(sortBy === 'positionAsc' ? '' : 'positionAsc')}
+                  className="inline-flex items-center gap-1 text-gray-700 hover:text-blue-700"
+                  title="Sort by Position (A→Z)"
+                >
+                  {headerButton('Position', sortBy === 'positionAsc')}
+                </button>
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Department
+                <button
+                  type="button"
+                  onClick={() => onSortChange(sortBy === 'departmentAsc' ? '' : 'departmentAsc')}
+                  className="inline-flex items-center gap-1 text-gray-700 hover:text-blue-700"
+                  title="Sort by Department (A→Z)"
+                >
+                  {headerButton('Department', sortBy === 'departmentAsc')}
+                </button>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date of Joining</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <button
+                  type="button"
+                  onClick={() => onSortChange(sortBy === 'dojAsc' ? '' : 'dojAsc')}
+                  className="inline-flex items-center gap-1 text-gray-700 hover:text-blue-700"
+                  title="Sort by Date of Joining (Old→New)"
+                >
+                  {headerButton('Date of Joining', sortBy === 'dojAsc')}
+                </button>
+              </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>

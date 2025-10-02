@@ -9,12 +9,16 @@ function App() {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState(''); 
 
+  // initial load
   useEffect(() => {
     const load = async () => {
       try {
-        const list = await apiService.getEmployees();
-        setEmployees(list);
+        const res = await apiService.searchEmployees('', 1, 5, sortBy);
+        setEmployees(res.items);
+        setTotal(res.total);
+        setPage(1);
       } catch (e) {
         console.error(e);
         alert('Failed to load employees');
@@ -23,10 +27,18 @@ function App() {
     load();
   }, []);
 
+  const reloadPage = async (targetPage = page) => {
+    const q = searchQuery.trim();
+    const res = await apiService.searchEmployees(q, targetPage, rowsPerPage, sortBy);
+    setEmployees(res.items || []);
+    setTotal(res.total || 0);
+    setPage(targetPage);
+  };
+
   const handleAddEmployee = async (employeeData, files) => {
     try {
-      const newEmployee = await apiService.createEmployee(employeeData, files);
-      setEmployees(prev => [...prev, newEmployee]);
+      await apiService.createEmployee(employeeData, files);
+      await reloadPage(1); // after add, reload first page (5 per page)
       setShowForm(false);
       alert('Employee added successfully!');
     } catch (e) {
@@ -36,8 +48,8 @@ function App() {
 
   const handleUpdateEmployee = async (employeeData, files) => {
     try {
-      const updatedEmployee = await apiService.updateEmployee(editingEmployee.employeeId, employeeData, files);
-      setEmployees(prev => prev.map(emp => emp.employeeId === editingEmployee.employeeId ? updatedEmployee : emp));
+      await apiService.updateEmployee(editingEmployee.employeeId, employeeData, files);
+      await reloadPage();
       setShowForm(false);
       setEditingEmployee(null);
       setIsEditing(false);
@@ -47,16 +59,23 @@ function App() {
     }
   };
 
-  const handleEditEmployee = (employee) => {
-    setEditingEmployee(employee);
-    setIsEditing(true);
-    setShowForm(true);
+  const handleEditEmployee = async (employee) => {
+    try {
+      const fresh = await apiService.getEmployeeById(employee.employeeId);
+      setEditingEmployee(fresh);
+      setIsEditing(true);
+      setShowForm(true);
+    } catch (e) {
+      alert(e?.message || 'Failed to fetch employee');
+    }
   };
 
   const handleDeleteEmployee = async (employeeId) => {
     try {
       await apiService.deleteEmployee(employeeId);
-      setEmployees(prev => prev.filter(emp => emp.employeeId !== employeeId));
+      // If last item on page removed, go to previous page if now empty
+      const nextPage = employees.length === 1 && page > 1 ? page - 1 : page;
+      await reloadPage(nextPage);
       alert('Employee deleted successfully!');
     } catch (e) {
       alert(e?.message || 'Error deleting employee. Please try again.');
@@ -84,24 +103,24 @@ function App() {
     setShowForm(true);
   };
 
-  const filteredEmployees = employees.filter((employee) => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return true;
-    const firstName = (employee.firstName || '').toLowerCase();
-    const lastName = (employee.lastName || '').toLowerCase();
-    const fullName = `${firstName} ${lastName}`.trim();
-    const email = (employee.email || '').toLowerCase();
-    const position = (employee.position || '').toLowerCase();
-    const department = (employee.department || '').toLowerCase();
-    const dateRaw = employee.dateOfJoining ? new Date(employee.dateOfJoining) : null;
-    const dateStr = dateRaw ? dateRaw.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' }).toLowerCase() : '';
-    const nameMatch = firstName.includes(query) || lastName.includes(query) || fullName.includes(query);
-    const emailMatch = email.includes(query);
-    const positionMatch = position.includes(query);
-    const departmentMatch = department.includes(query);
-    const dateMatch = dateStr.includes(query);
-    return nameMatch || emailMatch || positionMatch || departmentMatch || dateMatch;
-  });
+  // pagination + server-side search
+  const [page, setPage] = useState(1);
+  const [rowsPerPage] = useState(5);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const q = searchQuery.trim();
+        const res = await apiService.searchEmployees(q, page, rowsPerPage, sortBy);
+        setEmployees(res.items || []);
+        setTotal(res.total || 0);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    run();
+  }, [searchQuery, page, rowsPerPage, sortBy]);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -117,7 +136,7 @@ function App() {
             </div>
             <div className="flex items-center space-x-4">
               <div className="text-sm text-gray-500">
-                Total Employees: <span className="font-semibold text-gray-900">{employees.length}</span>
+                {/* Total Employees: <span className="font-semibold text-gray-900">{employees.length}</span> */}
               </div>
             </div>
           </div>
@@ -133,7 +152,7 @@ function App() {
               <div>
                 <h2 className="text-2xl font-semibold text-black-900">Employee Details</h2>
                 <p className="text-gray-600 mt-1">
-                  View and manage all employees in your organization
+                  View and manage all employees in your organization.
                 </p>
               </div>
               <div className="w-full sm:w-auto flex items-center gap-5">
@@ -160,10 +179,36 @@ function App() {
 
             {/* Employee List */}
             <EmployeeList
-              employees={filteredEmployees}
+              employees={employees}
               onEdit={handleEditEmployee}
               onDelete={handleDeleteEmployee}
+              sortBy={sortBy}
+              onSortChange={(next) => {
+                setSortBy(next);
+                setPage(1);
+              }}
             />
+
+            {/* Pagination */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-sm text-gray-600">Total records: <span className="font-medium">{total}</span></div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="px-3 py-1 rounded border disabled:opacity-50"
+                >Prev</button>
+                <span className="text-sm">Page {page}</span>
+                <button
+                  onClick={() => {
+                    const maxPage = Math.max(1, Math.ceil(total / rowsPerPage));
+                    setPage((p) => Math.min(maxPage, p + 1));
+                  }}
+                  disabled={page >= Math.ceil(total / rowsPerPage)}
+                  className="px-3 py-1 rounded border disabled:opacity-50"
+                >Next</button>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="max-w-4xl mx-auto">
